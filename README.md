@@ -642,8 +642,8 @@ See *Keys and settings (`.env`)* above. For a first run you only need three line
 **1. Download the project**
 
 ```bash
-git clone https://github.com/2Bol-afk/clinic_shit.git
-cd clinic_shit
+git clone https://github.com/promptwel/clinic-qr-system.git
+cd clinic-qr-system
 ```
 
 **2. Create a virtual environment and install the packages**
