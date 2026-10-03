@@ -1,0 +1,43 @@
+"""
+URL configuration for clinic_qr_system project.
+
+The `urlpatterns` list routes URLs to views. For more information please see:
+    https://docs.djangoproject.com/en/5.1/topics/http/urls/
+Examples:
+Function views
+    1. Add an import:  from my_app import views
+    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+Class-based views
+    1. Add an import:  from other_app.views import Home
+    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+Including another URLconf
+    1. Import the include() function: from django.urls import include, path
+    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+"""
+from django.contrib import admin
+from django.urls import path, include, re_path
+from django.views.static import serve
+from django.conf import settings
+from django.conf.urls.static import static
+from django.views.generic import RedirectView
+from django.contrib.auth import views as auth_views
+
+from dashboard import admin_views as dashboard_admin_views
+from patients import views as patient_views
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('accounts/forgot-password/', patient_views.forgot_password, name='forgot_password'),
+    # Removed Django built-in password change view to prevent account selection issues
+    # Custom password change views are used instead
+    path('', RedirectView.as_view(url='/accounts/login/', permanent=False)),
+    path('patients/', include('patients.urls')),
+    # Patient self-service reports
+    path('patient/report/', dashboard_admin_views.patient_report, name='patient_self_report'),
+    path('visits/', include('visits.urls')),
+    path('dashboard/', include('dashboard.urls')),
+    path('vaccinations/', include('vaccinations.urls')),
+    path('gmail-test/', include('gmail_test.urls')),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]

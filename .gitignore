@@ -25,3 +25,19 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+
+# Secrets / certs
+*.key
+*.crt
+*.pem
+dummy_acc.txt
+
+# Local data
+db.sqlite3
+media/
+profile_photos/
+staticfiles/
+
+# Credentials list
+accounts.txt
+email_previews/

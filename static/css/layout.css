@@ -1,0 +1,82 @@
+/* App shell: sticky sidebar + fluid content. Used by templates/base.html */
+:root { --sidebar-w: 264px; --topbar-h: 68px; }
+
+/* Larger base size: Bootstrap is rem-based, so everything scales together */
+html { font-size: 112.5%; }          /* 18px */
+@media (min-width: 1600px) { html { font-size: 118.75%; } }  /* 19px on big screens */
+@media (max-width: 575.98px) { html { font-size: 106.25%; } }
+
+.app-shell { display: flex; min-height: calc(100vh - var(--topbar-h)); }
+.app-main { flex: 1 1 auto; min-width: 0; padding: 1.5rem 2rem 2.5rem; }
+
+.app-sidebar { background: #fff; border-right: 1px solid #e3ece6; }
+.sidebar-title {
+  padding: 1rem 1.25rem .5rem; font-size: .7rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: #6c8576;
+}
+.sidebar-nav { padding: 0 .75rem; gap: 2px; }
+.sidebar-nav .nav-link {
+  display: flex; align-items: center; gap: .75rem; padding: .7rem .9rem;
+  border-radius: .6rem; color: #33443a; font-size: 1rem;
+}
+.sidebar-nav .nav-link i { font-size: 1.05rem; width: 1.25rem; text-align: center; color: #6c8576; }
+.sidebar-nav .nav-link:hover { background: #eef6f1; }
+.sidebar-nav .nav-link.active { background: #198754; color: #fff; }
+.sidebar-nav .nav-link.active i { color: #fff; }
+.sidebar-sep { height: 1px; background: #e3ece6; margin: .5rem .25rem; }
+.sidebar-user { padding: .9rem 1.25rem; border-top: 1px solid #e3ece6; font-size: .85rem; color: #6c8576; }
+
+@media (min-width: 992px) {
+  .app-sidebar {
+    flex: 0 0 var(--sidebar-w); width: var(--sidebar-w);
+    position: sticky; top: var(--topbar-h); align-self: flex-start;
+    height: calc(100vh - var(--topbar-h)); overflow-y: auto;
+  }
+}
+@media (max-width: 991.98px) {
+  .app-main { padding: 1rem; }
+}
+
+/* Dashboard widgets */
+.stat-card { border: 0; border-radius: .75rem; color: #fff; }
+.stat-card .stat-num { font-size: 1.75rem; font-weight: 700; line-height: 1.1; }
+.stat-card .stat-label { font-size: .8rem; opacity: .9; }
+.stat-card i { font-size: 1.6rem; opacity: .35; }
+.dept-row { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: .75rem; margin-bottom: .6rem; }
+.dept-row .progress { height: .6rem; }
+
+/* Bigger, easier-to-hit controls on every page */
+.app-main .form-control, .app-main .form-select { font-size: 1.02rem; padding: .6rem .85rem; min-height: 2.9rem; }
+.app-main textarea.form-control { min-height: 5rem; }
+.app-main .form-control-sm, .app-main .form-select-sm { font-size: .95rem; padding: .4rem .65rem; min-height: 2.4rem; }
+.app-main .form-label { font-weight: 600; }
+.app-main .btn { padding: .55rem 1.1rem; font-size: 1rem; }
+.app-main .btn-sm { padding: .4rem .8rem; font-size: .92rem; }
+.app-main .btn-lg { padding: .75rem 1.5rem; font-size: 1.1rem; }
+.app-main .badge { font-size: .82rem; padding: .4em .7em; }
+.app-main .table > :not(caption) > * > * { padding: .85rem .9rem; vertical-align: middle; }
+.app-main .table thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: #4b5d52; white-space: nowrap; }
+.app-main .card-header { padding: .9rem 1.25rem; font-weight: 600; }
+.app-main .card-body { padding: 1.25rem 1.4rem; }
+.app-main .list-group-item { padding: .85rem 1.1rem; }
+.app-main .alert { font-size: 1rem; padding: 1rem 1.25rem; }
+.app-main h4 { font-size: 1.5rem; }
+.app-main .nav-tabs .nav-link { padding: .7rem 1.2rem; }
+.app-main .modal-content { font-size: 1rem; }
+.navbar-brand { font-size: 1.25rem; }
+.table-responsive, .card .table { font-size: 1rem; }
+
+/* Patient mobile view. Scoped to patient + signed-out pages; staff and admin layouts stay desktop-only. */
+@media (max-width: 767.98px) {
+  body[data-user-role="patient"] .app-main .btn, body[data-user-role="guest"] .btn,
+  body[data-user-role="patient"] .app-main .form-control, body[data-user-role="guest"] .form-control,
+  body[data-user-role="patient"] .app-main .form-select, body[data-user-role="guest"] .form-select { min-height: 44px; }
+  body[data-user-role="patient"] .navbar .btn, body[data-user-role="guest"] .navbar .btn { min-height: 44px; min-width: 44px; }
+  body[data-user-role="patient"] .app-main img, body[data-user-role="guest"] main img { max-width: 100%; height: auto; }
+  body[data-user-role="patient"] #qrCodeImage { width: min(100%, 320px) !important; max-width: 100%; height: auto !important; }
+  body[data-user-role="patient"] .app-main, body[data-user-role="guest"] main { overflow-wrap: anywhere; }
+  body[data-user-role="guest"] main.container { margin-top: 1rem !important; margin-bottom: 1rem !important; }
+  body[data-user-role="patient"] .navbar-brand { font-size: 1.05rem; }
+  body[data-user-role="patient"] .app-main .table > :not(caption) > * > * { padding: .5rem .55rem; font-size: .85rem; }
+  body[data-user-role="patient"] .app-main .table thead th { font-size: .72rem; }
+}

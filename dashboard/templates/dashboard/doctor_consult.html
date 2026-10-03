@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .consult .card { margin-bottom: .6rem; }
+  .consult .card-body { padding: .6rem .75rem; }
+  .consult h6 { font-size: .85rem; margin-bottom: .4rem; }
+  .consult .form-label { font-size: .72rem; color: #6c757d; margin-bottom: .1rem; }
+  .consult .med-row { padding: .4rem .5rem !important; margin-bottom: .4rem !important; }
+  .consult .actions { position: sticky; bottom: 0; z-index: 5; padding: .5rem 0; background: var(--bs-body-bg, #fff); border-top: 1px solid #dee2e6; }
+</style>
+<div class="consult">
+  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <h5 class="mb-0 d-flex align-items-center"><i class="bi bi-journal-medical text-success me-2"></i>Doctor Consultation</h5>
+    {% if rec %}{% with p=rec.patient %}<span class="badge text-bg-light border fw-normal fs-6"><i class="bi bi-person me-1"></i>{{ p.full_name }} · {{ p.age }} yrs · ID {{ p.id }}</span>{% endwith %}
+    {% elif draft %}{% with p=draft.patient %}<span class="badge text-bg-light border fw-normal fs-6"><i class="bi bi-person me-1"></i>{{ p.full_name }} · {{ p.age }} yrs · ID {{ p.id }}</span>{% endwith %}{% endif %}
+    <a class="btn btn-outline-secondary btn-sm ms-auto" href="/dashboard/doctor/"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
+
+  <form method="post" id="consultForm">
+    {% csrf_token %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-lg-6">
+            <h6 class="d-flex align-items-center">Symptoms & History <span id="sStep" class="ms-2 small text-success d-none"><i class="bi bi-check-circle-fill"></i></span></h6>
+            <textarea name="symptoms" id="symptoms" class="form-control form-control-sm" rows="3">{{ draft.symptoms|default:'' }}</textarea>
+          </div>
+          <div class="col-lg-6">
+            <h6 class="d-flex align-items-center">Diagnosis <span id="dxStep" class="ms-2 small text-success d-none"><i class="bi bi-check-circle-fill"></i></span></h6>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label">Primary</label>
+                <textarea class="form-control form-control-sm" name="diagnosis" id="dxPrimary" rows="3">{{ dx_primary }}</textarea>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Secondary / related</label>
+                <textarea class="form-control form-control-sm" name="diagnosis_secondary" id="dxSecondary" rows="3">{{ dx_secondary }}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-1">
+          <h6 class="mb-0 d-flex align-items-center">Medication Prescription <span id="rxStep" class="ms-2 small text-success d-none"><i class="bi bi-check-circle-fill"></i></span></h6>
+          <button class="btn btn-outline-primary btn-sm ms-auto py-0" type="button" id="addMed"><i class="bi bi-plus-circle me-1"></i>Add Medicine</button>
+        </div>
+        <div id="medRows"></div>
+        <label class="form-label mt-1">Prescription Summary</label>
+        <textarea class="form-control form-control-sm" id="rxSummary" rows="2" readonly></textarea>
+        <textarea name="prescription_notes" id="prescription_notes" class="d-none">{{ draft.prescription_notes|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="row g-2 align-items-start">
+          <div class="col-lg-8">
+            <h6 class="d-flex align-items-center">Patient Instructions <span id="instStep" class="ms-2 small text-success d-none"><i class="bi bi-check-circle-fill"></i></span></h6>
+            <textarea class="form-control form-control-sm" name="patient_instructions" id="instructions" rows="2" placeholder="Take after meals; Avoid alcohol; ...">{{ instructions }}</textarea>
+          </div>
+          <div class="col-lg-4">
+            <h6>Lifestyle advice</h6>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="lifestyle" value="Diet" id="life_diet"{% if life_diet %} checked{% endif %}><label class="form-check-label" for="life_diet">Diet</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="lifestyle" value="Exercise" id="life_ex"{% if life_ex %} checked{% endif %}><label class="form-check-label" for="life_ex">Exercise</label></div>
+            <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="lifestyle" value="Rest" id="life_rest"{% if life_rest %} checked{% endif %}><label class="form-check-label" for="life_rest">Rest</label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions d-flex gap-2 justify-content-end">
+      <button class="btn btn-primary btn-sm" name="status" value="draft" type="submit"><i class="bi bi-save me-1"></i>Save (Not Done)</button>
+      <button class="btn btn-success btn-sm" name="status" value="done" type="submit"><i class="bi bi-check2-circle me-1"></i>Save & Mark Done</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  const medRows = document.getElementById('medRows');
+  const addMed = document.getElementById('addMed');
+  const rxSummary = document.getElementById('rxSummary');
+  const rxNotes = document.getElementById('prescription_notes');
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const DOSE_UNITS = ['mg','mcg','g','ml','IU','tablet','capsule','drop','puff'];
+  const DUR_UNITS = ['days','weeks','months'];
+  const DUR_DAYS = {days:1, weeks:7, months:30};
+  function opts(list, sel){ return list.map(u=>`<option value="${u}"${u===sel?' selected':''}>${u}</option>`).join(''); }
+  const q = (r, k) => r.querySelector(`[data-f="${k}"]`);
+  function calc(r){
+    const dose = q(r,'dose').value.trim(), du = q(r,'doseUnit').value;
+    const fN = parseFloat(q(r,'freq').value), fMode = q(r,'freqMode').value;
+    const dN = parseFloat(q(r,'dur').value), dU = q(r,'durUnit').value;
+    const days = dN > 0 ? dN * DUR_DAYS[dU] : 0;
+    const perDay = fN > 0 ? (fMode === 'hours' ? 24 / fN : fN) : 0;
+    return {
+      dosage: dose ? `${dose} ${du}` : '',
+      frequency: fN > 0 ? (fMode === 'hours' ? `every ${fN} hours` : `${fN} times a day`) : '',
+      duration: dN > 0 ? `${dN} ${dN === 1 ? dU.slice(0, -1) : dU}` : '',
+      total: Math.ceil(perDay * days)
+    };
+  }
+  function renderSummary(){
+    const lines = [];
+    medRows.querySelectorAll('.med-row').forEach((r, i)=>{
+      // renumber so the server (which stops at the first gap) always sees medicine_0, _1, ...
+      r.querySelectorAll('input[type=hidden][data-med]').forEach(h => h.name = `medicine_${i}_${h.dataset.med}`);
+      const c = calc(r);
+      if(!q(r,'qty').dataset.manual){ q(r,'qty').value = c.total || ''; }
+      const name = q(r,'name').value.trim();
+      const set = (k, v) => { r.querySelector(`[data-med="${k}"]`).value = v; };
+      set('name', name); set('dosage', c.dosage); set('frequency', c.frequency); set('duration', c.duration);
+      set('quantity', q(r,'qty').value.trim());
+      set('instructions', q(r,'instr').value.trim());
+      if(!name) return;
+      const when = [c.frequency, c.duration && `for ${c.duration}`].filter(Boolean).join(' ');
+      const parts = [`${lines.length+1}. ${name}${c.dosage ? ' ' + c.dosage : ''}`];
+      if(when) parts.push(when);
+      const qty = q(r,'qty').value.trim();
+      if(qty) parts.push(`Total: ${qty}`);
+      const note = q(r,'instr').value.trim().replace(/\s*\n\s*/g,' ');
+      if(note) parts.push(`Note: ${note}`);
+      lines.push(parts.join(' — '));
+    });
+    const txt = lines.join('\n');
+    rxSummary.value = txt;
+    rxNotes.value = txt;
+    document.getElementById('rxStep').classList.toggle('d-none', !txt);
+  }
+  function addRow(init){
+    init = init || {};
+    const div = document.createElement('div');
+    div.className = 'med-row border rounded p-2 mb-2 bg-white';
+    div.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4 col-xl-2">
+          <label class="form-label">Medicine</label>
+          <input class="form-control form-control-sm" data-f="name" value="${esc(init.name)}" placeholder="e.g., Amoxicillin">
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+          <label class="form-label">Dosage</label>
+          <div class="input-group input-group-sm">
+            <input type="number" min="0" step="any" class="form-control" style="flex:0 0 4.4rem" data-f="dose" value="${esc(init.dose)}" placeholder="500">
+            <select class="form-select" style="min-width:0;padding-left:.4rem;padding-right:1.4rem;background-position:right .35rem center" data-f="doseUnit">${opts(DOSE_UNITS, init.doseUnit||'mg')}</select>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+          <label class="form-label">Frequency</label>
+          <div class="input-group input-group-sm">
+            <input type="number" min="1" step="any" class="form-control" style="flex:0 0 4.4rem" data-f="freq" value="${esc(init.freq)}" placeholder="3">
+            <select class="form-select" style="min-width:0;padding-left:.4rem;padding-right:1.4rem;background-position:right .35rem center" data-f="freqMode">
+              <option value="daily"${init.freqMode!=='hours'?' selected':''}>x daily</option>
+              <option value="hours"${init.freqMode==='hours'?' selected':''}>hrs apart</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+          <label class="form-label">Duration</label>
+          <div class="input-group input-group-sm">
+            <input type="number" min="1" step="any" class="form-control" style="flex:0 0 4.4rem" data-f="dur" value="${esc(init.dur)}" placeholder="7">
+            <select class="form-select" style="min-width:0;padding-left:.4rem;padding-right:1.4rem;background-position:right .35rem center" data-f="durUnit">${opts(DUR_UNITS, init.durUnit||'days')}</select>
+          </div>
+        </div>
+        <div class="col-3 col-md-2 col-xl-1">
+          <label class="form-label" title="Auto total: per day x days. Type to override.">Qty</label>
+          <input type="number" min="0" class="form-control form-control-sm" data-f="qty" value="${esc(init.qty)}" placeholder="auto">
+        </div>
+        <div class="col-9 col-md-5 col-xl-2">
+          <label class="form-label">Special instructions</label>
+          <textarea class="form-control form-control-sm" data-f="instr" rows="1" placeholder="Optional">${esc(init.instr)}</textarea>
+        </div>
+        <div class="col-12 col-md-1 col-xl-1 text-end">
+          <button class="btn btn-outline-danger btn-sm" type="button" data-action="remove" title="Remove"><i class="bi bi-x"></i></button>
+        </div>
+      </div>
+      ${['name','dosage','frequency','duration','quantity','instructions'].map(k=>`<input type="hidden" data-med="${k}">`).join('')}`;
+    if(init.qty) q(div,'qty').dataset.manual = '';  // restored value; recomputed on next edit unless typed by hand
+    q(div,'qty').addEventListener('input', e => {
+      if(e.target.value === '') delete e.target.dataset.manual; else e.target.dataset.manual = '1';
+    });
+    div.addEventListener('input', renderSummary);
+    div.addEventListener('change', renderSummary);
+    div.addEventListener('click', (e)=>{ if(e.target.closest('[data-action="remove"]')){ div.remove(); renderSummary(); }});
+    medRows.appendChild(div);
+    renderSummary();
+  }
+  addMed.addEventListener('click', ()=> addRow());
+  // Prefill from saved summary: "1. Name 500 mg — 3 times a day for 7 days — Total: 21 — Note: ..."
+  (function prefill(){
+    const text = rxNotes.value.trim();
+    if(!text) return;
+    text.split('\n').forEach(ln=>{
+      const parts = ln.split(/\s+[—–]\s+/);
+      const head = (parts[0]||'').replace(/^\d+\.\s*/, '');
+      const m = head.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*([A-Za-z]+)$/);
+      const init = { name: m ? m[1] : head, dose: m ? m[2] : '', doseUnit: m ? m[3] : 'mg' };
+      const rest = parts.slice(1).join(' — ');
+      const f = rest.match(/every\s+(\d+(?:\.\d+)?)\s+hours/i) || rest.match(/(\d+(?:\.\d+)?)\s+times a day/i);
+      if(f){ init.freq = f[1]; init.freqMode = /every/i.test(f[0]) ? 'hours' : 'daily'; }
+      const d = rest.match(/for\s+(\d+(?:\.\d+)?)\s+(days?|weeks?|months?)/i);
+      if(d){ init.dur = d[1]; init.durUnit = d[2].toLowerCase().replace(/s?$/, 's'); }
+      const t = rest.match(/Total:\s*(\d+)/i); if(t) init.qty = t[1];
+      const n = rest.match(/Note:\s*(.*)$/i); if(n) init.instr = n[1];
+      if(head) addRow(init);
+    });
+  })();
+  if(!medRows.querySelector('.med-row')) addRow();
+  // Step indicators
+  document.getElementById('symptoms').addEventListener('input', ()=>{
+    document.getElementById('sStep').classList.toggle('d-none', !document.getElementById('symptoms').value.trim());
+  });
+  document.getElementById('dxPrimary').addEventListener('input', ()=>{
+    document.getElementById('dxStep').classList.toggle('d-none', !document.getElementById('dxPrimary').value.trim());
+  });
+  document.getElementById('instructions').addEventListener('input', ()=>{
+    document.getElementById('instStep').classList.toggle('d-none', !document.getElementById('instructions').value.trim());
+  });
+  ['symptoms','dxPrimary','instructions'].forEach(id=>{ const el = document.getElementById(id); el.dispatchEvent(new Event('input')); });
+})();
+</script>
+{% endblock %}

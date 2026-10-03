@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ subject|default:clinic_name }}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; color: #2d3748;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f7f6; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07); border: 1px solid #e6ebed;">
+          
+          <!-- Top Accent Color Bar -->
+          <tr>
+            <td style="background: linear-gradient(90deg, #198754, #20c997); height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
+          </tr>
+
+          <!-- System Header with Logo -->
+          <tr>
+            <td style="padding: 32px 30px 24px 30px; text-align: center; background-color: #ffffff; border-bottom: 1px solid #edf2f7;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <img src="{{ clinic_logo_url }}" alt="{{ clinic_name }} Logo" width="84" height="84" style="display: block; margin: 0 auto; border-radius: 50%; object-fit: cover; border: 3px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.2);">
+                    <h1 style="margin: 14px 0 4px 0; font-size: 22px; font-weight: 700; color: #198754; letter-spacing: -0.2px;">
+                      {{ clinic_name }}
+                    </h1>
+                    <span style="display: inline-block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #4a5568; background-color: #e8f5e9; padding: 3px 12px; border-radius: 20px;">
+                      {{ clinic_system_name }}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Email Content Body -->
+          <tr>
+            <td style="padding: 30px 32px; font-size: 15px; line-height: 1.65; color: #334155;">
+              {% block content %}
+              {% endblock %}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 30px; background-color: #f8fafc; border-top: 1px solid #edf2f7; text-align: center; font-size: 12px; color: #718096; line-height: 1.6;">
+              <p style="margin: 0 0 6px 0; font-weight: 600; color: #4a5568;">
+                {{ clinic_name }} &bull; {{ clinic_system_name }}
+              </p>
+              {% if clinic_address %}
+              <p style="margin: 0 0 6px 0;">
+                {{ clinic_address }}
+              </p>
+              {% endif %}
+              <p style="margin: 0 0 10px 0;">
+                {% if clinic_contact_email %}
+                Email: <a href="mailto:{{ clinic_contact_email }}" style="color: #198754; text-decoration: none; font-weight: 500;">{{ clinic_contact_email }}</a>
+                {% endif %}
+                {% if clinic_contact_phone %}
+                &nbsp;&bull;&nbsp; Phone: {{ clinic_contact_phone }}
+                {% endif %}
+              </p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0 12px 0;">
+              <p style="margin: 0; font-size: 11px; color: #a0aec0;">
+                This is a secure automated notification sent via {{ clinic_system_name }}. If you received this in error, please disregard or notify the clinic.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{% comment %}Role-aware sidebar. Included by base.html for authenticated users.{% endcomment %}
+{% with p=request.path role=request.user.groups.all.0.name %}
+<aside class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar">
+  <div class="offcanvas-header d-lg-none">
+    <h6 class="offcanvas-title"><i class="bi bi-hospital me-2"></i>Menu</h6>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#appSidebar"></button>
+  </div>
+  <div class="offcanvas-body flex-column p-0">
+    <div class="sidebar-title">
+      {% if request.user.is_superuser %}Admin{% elif role %}{{ role }}{% else %}Staff{% endif %}
+    </div>
+    <nav class="nav flex-column sidebar-nav">
+      {% if request.user.is_superuser %}
+        <a class="nav-link {% if p == '/dashboard/admin/' %}active{% endif %}" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i>Dashboard</a>
+        <a class="nav-link {% if '/dashboard/admin/patients' in p or '/patients/admin' in p %}active{% endif %}" href="{% url 'admin_patient_management' %}"><i class="bi bi-person-heart"></i>Patients</a>
+        <a class="nav-link {% if '/dashboard/doctors' in p %}active{% endif %}" href="{% url 'doctor_list' %}"><i class="bi bi-person-badge"></i>Doctors</a>
+        <a class="nav-link {% if '/dashboard/admin/system-accounts' in p %}active{% endif %}" href="{% url 'admin_system_accounts' %}"><i class="bi bi-people"></i>System Accounts</a>
+        <a class="nav-link {% if p == '/dashboard/admin/reports/' %}active{% endif %}" href="{% url 'admin_reports' %}"><i class="bi bi-graph-up"></i>Reports</a>
+        <a class="nav-link {% if '/dashboard/admin/system-reports' in p %}active{% endif %}" href="{% url 'admin_system_reports' %}"><i class="bi bi-clipboard-data"></i>System Reports</a>
+        <div class="sidebar-sep"></div>
+        <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i>Django Admin</a>
+      {% elif role == 'Reception' %}
+        <a class="nav-link {% if p == '/dashboard/reception/' %}active{% endif %}" href="{% url 'dashboard_reception' %}"><i class="bi bi-door-open"></i>Dashboard</a>
+        <a class="nav-link {% if '/reception/walkin' in p %}active{% endif %}" href="{% url 'reception_walkin' %}"><i class="bi bi-person-plus"></i>Walk-in Registration</a>
+        <a class="nav-link {% if '/visits/scan' in p %}active{% endif %}" href="{% url 'visit_scan' %}"><i class="bi bi-qr-code-scan"></i>Scan / Log Arrival</a>
+        <a class="nav-link {% if p == '/dashboard/reports/' %}active{% endif %}" href="/dashboard/reports/"><i class="bi bi-graph-up"></i>Reports</a>
+      {% elif role == 'Doctor' %}
+        <a class="nav-link {% if p == '/dashboard/doctor/' %}active{% endif %}" href="{% url 'dashboard_doctor' %}"><i class="bi bi-stethoscope"></i>Dashboard</a>
+        <a class="nav-link {% if p == '/dashboard/reports/' %}active{% endif %}" href="/dashboard/reports/"><i class="bi bi-graph-up"></i>Reports</a>
+      {% elif role == 'Laboratory' %}
+        <a class="nav-link {% if p == '/dashboard/lab/' %}active{% endif %}" href="{% url 'dashboard_lab' %}"><i class="bi bi-flask"></i>Dashboard</a>
+        <a class="nav-link {% if p == '/dashboard/reports/' %}active{% endif %}" href="/dashboard/reports/"><i class="bi bi-graph-up"></i>Reports</a>
+      {% elif role == 'Pharmacy' %}
+        <a class="nav-link {% if p == '/dashboard/pharmacy/' %}active{% endif %}" href="{% url 'dashboard_pharmacy' %}"><i class="bi bi-capsule"></i>Dashboard</a>
+        <a class="nav-link {% if p == '/dashboard/reports/' %}active{% endif %}" href="/dashboard/reports/"><i class="bi bi-graph-up"></i>Reports</a>
+      {% elif role == 'Vaccination' %}
+        <a class="nav-link {% if p == '/dashboard/vaccination/' %}active{% endif %}" href="{% url 'dashboard_vaccination' %}"><i class="bi bi-shield-plus"></i>Dashboard</a>
+        <a class="nav-link {% if p == '/dashboard/reports/' %}active{% endif %}" href="/dashboard/reports/"><i class="bi bi-graph-up"></i>Reports</a>
+      {% elif role == 'Patient' %}
+        <a class="nav-link {% if p == '/patients/portal/' %}active{% endif %}" href="{% url 'patient_portal' %}"><i class="bi bi-house-heart"></i>My Portal</a>
+        <a class="nav-link {% if p == '/patient/report/' %}active{% endif %}" href="{% url 'patient_self_report' %}"><i class="bi bi-graph-up"></i>My Reports</a>
+        <a class="nav-link {% if '/patients/account/edit' in p %}active{% endif %}" href="{% url 'patient_account_edit' %}"><i class="bi bi-person-gear"></i>My Account</a>
+      {% else %}
+        <a class="nav-link" href="/dashboard/"><i class="bi bi-house"></i>Home</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-user mt-auto">
+      <i class="bi bi-person-circle me-2"></i>{{ request.user.username }}
+    </div>
+  </div>
+</aside>
+{% endwith %}
