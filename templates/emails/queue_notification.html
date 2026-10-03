@@ -1,0 +1,39 @@
+{% extends 'emails/base_email.html' %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+  <h2 style="margin: 0 0 12px 0; font-size: 20px; font-weight: 700; color: #1e293b;">{{ heading }}</h2>
+
+  <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155;">
+    Dear <strong>{{ patient_name }}</strong>, you have been added to the queue. Please keep this email handy.
+  </p>
+
+  <div style="background: linear-gradient(135deg, #f0fdf4, #e8f5e9); border: 2px dashed #198754; border-radius: 10px; padding: 20px; text-align: center; margin: 24px 0;">
+    <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #166534;">Your Queue Number</span>
+    <div style="font-size: 44px; font-weight: 800; color: #198754; line-height: 1.1; margin-top: 4px;">{{ queue_number }}</div>
+  </div>
+
+  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 22px; margin: 20px 0;">
+    <table role="presentation" border="0" cellpadding="4" cellspacing="0" width="100%" style="font-size: 14px; color: #334155;">
+      <tr><td style="font-weight: 600; width: 35%;">Service:</td><td>{{ service_label }}</td></tr>
+      {% if department %}<tr><td style="font-weight: 600;">Department:</td><td>{{ department }}</td></tr>{% endif %}
+      {% if visit_id %}<tr><td style="font-weight: 600;">Reference ID:</td><td>#{{ visit_id }}</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px; padding: 16px 20px; margin: 20px 0;">
+    <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #1e40af;">What to do next</h4>
+    <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #1e3a8a; line-height: 1.6;">
+      {% for tip in tips %}<li>{{ tip }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  {% if portal_url %}
+  <div style="text-align: center; margin: 30px 0 10px 0;">
+    <a href="{{ portal_url }}" style="background-color: #198754; color: #ffffff; padding: 13px 32px; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px; display: inline-block;">Open Patient Portal &rarr;</a>
+  </div>
+  {% endif %}
+
+  <p style="margin: 20px 0 0 0; font-size: 13px; color: #64748b;">Thank you for your patience.</p>
+</div>
+{% endblock %}

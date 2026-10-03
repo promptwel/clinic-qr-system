@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .walkin-card .form-label { font-weight: 600; font-size: 1.02rem; margin-bottom: .4rem; }
+  .walkin-card .section-title { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #198754; margin: .25rem 0 .75rem; padding-bottom: .5rem; border-bottom: 1px solid #e3ece6; }
+  .walkin-card .form-control-lg, .walkin-card .form-select-lg { font-size: 1.05rem; }
+  .walkin-card .form-text { font-size: .88rem; }
+  .walkin-card .is-invalid ~ .field-error { display: block; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="mb-1 d-flex align-items-center"><i class="bi bi-person-plus text-success me-2"></i>Walk-in Registration</h3>
+    <div class="text-muted">Register a new patient or queue an existing one. The QR code and login details are emailed automatically.</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-lg" href="/dashboard/reception/"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+{% if pre_selected_patient %}
+<div class="alert alert-info mb-4">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-info-circle fs-4 me-3"></i>
+    <div>
+      <h6 class="alert-heading mb-1">Patient selected from QR scan</h6>
+      <div><strong>{{ pre_selected_patient.full_name }}</strong> ({{ pre_selected_patient.patient_code }}) &middot; {{ pre_selected_patient.email }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm walkin-card">
+  <div class="card-body p-4 p-xl-5">
+    <form method="post" enctype="multipart/form-data" class="row g-4" id="walkinForm" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="col-12"><div class="alert alert-danger mb-0">{{ form.non_field_errors }}</div></div>
+      {% endif %}
+
+      <div class="col-12"><div class="section-title">Patient information</div></div>
+
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ form.full_name.id_for_label }}">Full name <span class="text-danger">*</span></label>
+        {{ form.full_name }}
+        <div class="invalid-feedback">{% for e in form.full_name.errors %}{{ e }} {% empty %}Enter a valid full name (letters only).{% endfor %}</div>
+        <div class="form-text">First and last name, e.g. Maria Santos.</div>
+      </div>
+      <div class="col-lg-3 col-sm-6">
+        <label class="form-label" for="{{ form.age.id_for_label }}">Age <span class="text-danger">*</span></label>
+        {{ form.age }}
+        <div class="invalid-feedback">{% for e in form.age.errors %}{{ e }} {% empty %}Age must be between 0 and 120.{% endfor %}</div>
+      </div>
+      <div class="col-lg-3 col-sm-6">
+        <label class="form-label" for="{{ form.contact.id_for_label }}">Contact number <span class="text-danger">*</span></label>
+        {{ form.contact }}
+        <div class="invalid-feedback">{% for e in form.contact.errors %}{{ e }} {% empty %}Use a valid number, e.g. 09171234567.{% endfor %}</div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label" for="{{ form.address.id_for_label }}">Address <span class="text-danger">*</span></label>
+        {{ form.address }}
+        <div class="invalid-feedback">{% for e in form.address.errors %}{{ e }} {% empty %}Enter a complete address.{% endfor %}</div>
+      </div>
+
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ form.email.id_for_label }}">Email <span class="text-danger">*</span></label>
+        {{ form.email }}
+        <div class="invalid-feedback">{% for e in form.email.errors %}{{ e }} {% empty %}Enter a valid email address.{% endfor %}</div>
+        <div class="form-text">The QR code and portal login are sent here.</div>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ form.profile_photo.id_for_label }}">Profile photo <span class="text-muted fw-normal">(optional)</span></label>
+        {{ form.profile_photo }}
+        <div class="invalid-feedback">{% for e in form.profile_photo.errors %}{{ e }} {% empty %}Upload a JPG, PNG or GIF under 5MB.{% endfor %}</div>
+        <div class="form-text">JPG, PNG or GIF, max 5MB. A default photo is used if left empty.</div>
+      </div>
+
+      <div class="col-12 mt-4"><div class="section-title">Visit details</div></div>
+
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ form.reception_visit_type.id_for_label }}">Visit type <span class="text-danger">*</span></label>
+        {{ form.reception_visit_type }}
+        <div class="invalid-feedback">Select a visit type.</div>
+      </div>
+      <div class="col-lg-6" id="deptWrap">
+        <label class="form-label" for="{{ form.department.id_for_label }}">Department <span class="text-danger">*</span></label>
+        {{ form.department }}
+        <div class="invalid-feedback">{% for e in form.department.errors %}{{ e }} {% empty %}Select a department.{% endfor %}</div>
+      </div>
+
+      <div class="col-12 d-flex gap-2 pt-2">
+        <button class="btn btn-success btn-lg px-4" type="submit" id="submitBtn"><i class="bi bi-check2-circle me-2"></i>Register &amp; Queue</button>
+        <a href="/dashboard/reception/" class="btn btn-outline-secondary btn-lg px-4">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const form = document.getElementById('walkinForm');
+  const btn = document.getElementById('submitBtn');
+  const typeSel = form.querySelector('[name="reception_visit_type"]');
+  const dept = document.getElementById('deptWrap');
+  const deptSel = form.querySelector('[name="department"]');
+
+  // Server-side errors: mark the fields that came back invalid
+  const serverErrors = [{% for f in form %}{% if f.errors %}'{{ f.html_name }}',{% endif %}{% endfor %}];
+  serverErrors.forEach(n => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.classList.add('is-invalid'); });
+
+  function syncDept(){
+    const isConsult = typeSel.value === 'consultation';
+    dept.style.display = isConsult ? '' : 'none';
+    deptSel.required = isConsult;
+  }
+  typeSel.addEventListener('change', syncDept); syncDept();
+
+  // Input hygiene while typing
+  const name = form.querySelector('[name="full_name"]');
+  name.addEventListener('input', () => { name.value = name.value.replace(/[^A-Za-zÀ-ÿ .'\-]/g, ''); });
+  const contact = form.querySelector('[name="contact"]');
+  contact.addEventListener('input', () => { contact.value = contact.value.replace(/[^0-9+ \-()]/g, ''); });
+  const email = form.querySelector('[name="email"]');
+  email.addEventListener('blur', () => { email.value = email.value.trim().toLowerCase(); });
+
+  // Live validation feedback
+  form.querySelectorAll('input, select, textarea').forEach(el => {
+    const check = () => { if (el.type !== 'file' || el.value) el.classList.toggle('is-invalid', !el.checkValidity()); };
+    el.addEventListener('blur', check);
+    el.addEventListener('input', () => { if (el.classList.contains('is-invalid')) check(); });
+  });
+
+  form.addEventListener('submit', function(e){
+    form.querySelectorAll('input, select, textarea').forEach(el => el.classList.toggle('is-invalid', !el.checkValidity()));
+    if (!form.checkValidity()) {
+      e.preventDefault();
+      const first = form.querySelector('.is-invalid'); if (first) first.focus();
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Submitting...';
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+{% block content %}
+<h4 class="d-flex align-items-center mb-3"><i class="bi bi-file-earmark-text text-success me-2"></i>My Medical Records</h4>
+
+<!-- Filters -->
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Start Date</label>
+        <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">End Date</label>
+        <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Filter</button>
+      </div>
+      <div class="col-12 d-flex flex-wrap align-items-end gap-2">
+        <button type="button" class="btn btn-success btn-sm" onclick="printReport()"><i class="bi bi-printer me-1"></i>Print Report</button>
+        <a href="?start_date={{ start_date }}&end_date={{ end_date }}&export=pdf" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+        </a>
+        <a href="?start_date={{ start_date }}&end_date={{ end_date }}&export=csv" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-filetype-csv me-1"></i>Export CSV
+        </a>
+        <a href="?start_date={{ start_date }}&end_date={{ end_date }}&export=xlsx" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-file-earmark-excel me-1"></i>Export XLSX
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Consultations -->
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-stethoscope me-1"></i>Consultations</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table table-striped mb-0">
+      <thead class="table-light"><tr><th>Date</th><th>Doctor</th><th>Diagnosis/Notes</th></tr></thead>
+      <tbody>
+        {% for v in doctor_visits %}
+          <tr>
+            <td>{{ v.timestamp|date:'Y-m-d H:i' }}</td>
+            <td>{{ v.doctor_user.get_full_name|default:v.doctor_user.username|default:'—' }}</td>
+            <td><div>{{ v.diagnosis|default:'—' }}</div>{% if v.prescription_notes %}<div class="small text-muted">Rx: {{ v.prescription_notes }}</div>{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">No consultations.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Prescriptions -->
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-capsule me-1"></i>Prescriptions</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table table-striped mb-0">
+      <thead class="table-light"><tr><th>Date</th><th>Doctor</th><th>Medicines</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for pr in prescriptions %}
+          <tr>
+            <td>{{ pr.created_at|date:'Y-m-d H:i' }}</td>
+            <td>{{ pr.doctor.get_full_name|default:pr.doctor.username|default:'—' }}</td>
+            <td>
+              {% for m in pr.medicines.all %}
+                <div class="small">• {{ m.drug_name }} {{ m.dosage }} {{ m.frequency }} {{ m.duration }}</div>
+              {% endfor %}
+            </td>
+            <td><span class="badge {% if pr.status == 'dispensed' %}bg-success{% elif pr.status == 'ready' %}bg-info{% else %}bg-secondary{% endif %}">{{ pr.get_status_display }}</span></td>
+          </tr>
+        {% empty %}
+          {% with shown=0 %}
+            {% for v in doctor_visits %}
+              {% if v.prescription_notes %}
+                {% if shown %}{% else %}{% endif %}
+                <tr>
+                  <td>{{ v.timestamp|date:'Y-m-d H:i' }}</td>
+                  <td>{{ v.doctor_user.get_full_name|default:v.doctor_user.username|default:'—' }}</td>
+                  <td class="small">{{ v.prescription_notes|linebreaksbr }}</td>
+                  <td><span class="badge bg-secondary">From Consultation</span></td>
+                </tr>
+                {% with shown=1 %}{% endwith %}
+              {% endif %}
+            {% endfor %}
+            {% if not shown %}
+              <tr><td colspan="4" class="text-center text-muted">No prescriptions.</td></tr>
+            {% endif %}
+          {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Laboratory -->
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-activity me-1"></i>Laboratory Tests</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table table-striped mb-0">
+      <thead class="table-light"><tr><th>Date</th><th>Test</th><th>Status</th><th>Results</th></tr></thead>
+      <tbody>
+        {% for v in lab_visits %}
+          <tr>
+            <td>{{ v.timestamp|date:'Y-m-d H:i' }}</td>
+            <td>{{ v.lab_test_type|default:v.lab_tests|default:'—' }}</td>
+            <td><span class="badge {% if v.status == 'done' %}bg-success{% elif v.status == 'in_process' %}bg-warning{% else %}bg-secondary{% endif %}">{{ v.get_status_display }}</span></td>
+            <td class="small">{{ v.lab_results|default:'—' }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="text-center text-muted">No lab records.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Vaccinations -->
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-shield-plus me-1"></i>Vaccinations</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table table-striped mb-0">
+      <thead class="table-light"><tr><th>Date</th><th>Vaccine</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for rec in vaccinations %}
+          <tr>
+            <td>{{ rec.created_at|date:'Y-m-d H:i' }}</td>
+            <td>{{ rec.vaccine_type }}</td>
+            <td><span class="badge {% if rec.status == 'done' %}bg-success{% elif rec.status == 'in_process' %}bg-warning{% else %}bg-secondary{% endif %}">{{ rec.get_status_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">No vaccination records.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function buildPrintableHtml(inner){
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Patient Report</title><style>body{font-family:Arial} .print-table{width:100%;border-collapse:collapse;font-size:12px} .print-table th,.print-table td{border:1px solid #000;padding:4px;text-align:left} .print-table th{background:#f0f0f0}</style></head><body>${inner}</body></html>`;
+}
+function printReport(){
+  try {
+    // Get all report sections using simpler selectors
+    const consultationsCard = Array.from(document.querySelectorAll('.card')).find(card => 
+      card.querySelector('.card-header') && 
+      card.querySelector('.card-header').textContent.includes('Consultations'));
+    
+    const prescriptionsCard = Array.from(document.querySelectorAll('.card')).find(card => 
+      card.querySelector('.card-header') && 
+      card.querySelector('.card-header').textContent.includes('Prescriptions'));
+    
+    const labCard = Array.from(document.querySelectorAll('.card')).find(card => 
+      card.querySelector('.card-header') && 
+      card.querySelector('.card-header').textContent.includes('Laboratory'));
+    
+    const vaccinationCard = Array.from(document.querySelectorAll('.card')).find(card => 
+      card.querySelector('.card-header') && 
+      card.querySelector('.card-header').textContent.includes('Vaccinations'));
+    
+    if (!consultationsCard) { 
+      console.log('No consultations card found, falling back to window.print()');
+      window.print(); 
+      return; 
+    }
+    
+    // Create a clean HTML structure for printing with structured layout
+    const printContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <h1 style="text-align: center; margin-bottom: 20px; color: #333;">Patient Medical Report</h1>
+        <div style="margin-bottom: 30px; font-size: 14px; text-align: center; color: #666;">
+          <strong>Report Period:</strong> ${document.querySelector('input[name="start_date"]').value} to ${document.querySelector('input[name="end_date"]').value}
+        </div>
+        
+        <!-- CONSULTATIONS SECTION -->
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 15px;">CONSULTATIONS</h2>
+          ${consultationsCard ? consultationsCard.querySelector('.card-body').outerHTML : '<p>No consultation data available.</p>'}
+        </div>
+        
+        <!-- PRESCRIPTIONS SECTION -->
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 5px; margin-bottom: 15px;">PRESCRIPTIONS</h2>
+          ${prescriptionsCard ? prescriptionsCard.querySelector('.card-body').outerHTML : '<p>No prescription data available.</p>'}
+        </div>
+        
+        <!-- LABORATORY TESTS SECTION -->
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #f39c12; padding-bottom: 5px; margin-bottom: 15px;">LABORATORY TESTS</h2>
+          ${labCard ? labCard.querySelector('.card-body').outerHTML : '<p>No laboratory data available.</p>'}
+        </div>
+        
+        <!-- VACCINATIONS SECTION -->
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 5px; margin-bottom: 15px;">VACCINATIONS</h2>
+          ${vaccinationCard ? vaccinationCard.querySelector('.card-body').outerHTML : '<p>No vaccination data available.</p>'}
+        </div>
+      </div>
+    `;
+    
+    const html = buildPrintableHtml(printContent);
+    const iframe = document.createElement('iframe');
+    iframe.style.position='fixed';iframe.style.right='0';iframe.style.bottom='0';iframe.style.width='0';iframe.style.height='0';iframe.style.border='0';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow || iframe.contentDocument; const idoc = doc.document || doc; idoc.open(); idoc.write(html); idoc.close();
+    const cleanup=()=>{try{document.body.removeChild(iframe);}catch(_){}};
+    iframe.onload=function(){try{(iframe.contentWindow||iframe).focus();(iframe.contentWindow||iframe).print();}catch(_){}};
+    setTimeout(()=>{try{(iframe.contentWindow||iframe).focus();(iframe.contentWindow||iframe).print();}catch(_){}} ,300);
+    const w = iframe.contentWindow || iframe; if(w){ w.onafterprint = cleanup; }
+    setTimeout(cleanup,5000);
+  } catch(e) { 
+    console.log('Print error:', e);
+    window.print(); 
+  }
+}
+</script>
+{% endblock %}
+
+

@@ -1,0 +1,578 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<h4 class="d-flex align-items-center mb-3"><i class="bi bi-flask text-success me-2"></i>Laboratory Dashboard</h4>
+ 
+<div class="row g-3">
+  <div class="col-md-6">
+    <h6>Unclaimed (Reception-tagged for Lab)</h6>
+    <ul class="list-group mb-3" data-container="queued">
+      {% for v in pending_unclaimed %}
+        <li class="list-group-item" data-card>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <span class="d-inline-flex align-items-center gap-2">{% include 'partials/avatar.html' with photo=v.patient.profile_photo size=28 %}<span>{{ v.patient.full_name }}</span></span>
+              <div class="small text-muted">Queue: {{ v.queue_number|default:'—' }}</div>
+              <div class="small">At: {{ v.timestamp|date:'Y-m-d H:i' }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <form method="post" action="/dashboard/lab/claim/">
+                {% csrf_token %}
+                <input type="hidden" name="reception_visit_id" value="{{ v.id }}">
+                <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-person-plus me-1"></i>Claim</button>
+              </form>
+            </div>
+          </div>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No unclaimed tickets.</li>
+      {% endfor %}
+    </ul>
+    <h6>Claimed · Waiting to Arrive (verify QR on arrival)</h6>
+    <ul class="list-group" data-container="claimed">
+      {% for v in pending_claimed %}
+        <li class="list-group-item" data-card data-patient-code="{{ v.patient.patient_code }}" data-visit-id="{{ v.id }}">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <span class="d-inline-flex align-items-center gap-2">{% include 'partials/avatar.html' with photo=v.patient.profile_photo size=28 %}<span>{{ v.patient.full_name }}</span></span>
+              <div class="small text-muted">From Reception · Queue: {{ v.queue_number|default:'—' }}</div>
+              <div class="small">At: {{ v.timestamp|date:'Y-m-d H:i' }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#verifyModal" data-visit="{{ v.id }}"><i class="bi bi-qr-code-scan me-1"></i>Verify</button>
+            </div>
+          </div>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No claimed tickets waiting to arrive.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <!-- Verify Modal -->
+  <div class="modal fade" id="verifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Verify Arrival</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="post" action="/dashboard/lab/receive/">
+          {% csrf_token %}
+        <div class="modal-body">
+          <input type="hidden" name="reception_visit_id" id="verifyVisitId">
+          <input type="hidden" name="verify_code" id="verifyCodeHidden">
+          
+          <!-- QR Scanner Section -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header d-flex align-items-center">
+                  <i class="bi bi-camera me-2 text-primary"></i>
+                  <span class="fw-semibold">Scan QR Code</span>
+                </div>
+                <div class="card-body text-center">
+                  <button type="button" class="btn btn-lg btn-outline-primary qr-scan-btn" data-intent="verify">
+                    <i class="bi bi-camera qr-icon"></i>
+                    <span>Scan Patient QR</span>
+                  </button>
+                  <p class="text-muted mt-2 small">Use camera to scan patient's QR code</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header d-flex align-items-center">
+                  <i class="bi bi-envelope me-2 text-secondary"></i>
+                  <span class="fw-semibold">Manual Entry</span>
+                </div>
+                <div class="card-body">
+                  <div class="mb-3">
+                    <label class="form-label">Enter Patient Email</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                      <input type="email" class="form-control" name="patient_email" id="modalPatientEmail" placeholder="patient@example.com" required>
+                    </div>
+                    <div class="text-danger small mt-1 d-none" id="emailError"></div>
+                    <div class="text-success small mt-1 d-none" id="emailOk">Email verified.</div>
+                  </div>
+                  <button class="btn btn-outline-primary" id="btnVerifyEmail" type="button">
+                    <i class="bi bi-check-circle me-1"></i>Verify Email
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Verified Patient Profile (hidden until verified) -->
+          <div id="labVerifiedProfile" class="card mb-3 d-none">
+            <div class="card-body d-flex align-items-center">
+              <img id="labPatientPhoto" src="" alt="Profile" class="rounded-circle me-3" style="width:48px;height:48px;object-fit:cover;display:none;">
+              <div>
+                <div class="fw-semibold" id="labPatientName">Patient Name</div>
+                <div class="small text-muted">
+                  ID: <span id="labPatientCode">—</span> · Email: <span id="labPatientEmail">—</span>
+                </div>
+                <div class="text-success small mt-1 d-none" id="labVerifiedBadge"><i class="bi bi-check-circle me-1"></i>Verified Patient</div>
+              </div>
+            </div>
+          </div>
+          
+          <label class="form-label mt-3">Test Type</label>
+          <select name="lab_test_type" id="modalTestType" class="form-select" disabled required>
+            {% for code,label in lab_types %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-success" id="modalSubmitBtn" type="submit" disabled>Verify & Receive</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <h6>Ready to Process</h6>
+    <ul class="list-group mb-3" data-container="ready">
+      {% for r in in_process %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a class="fw-semibold" href="/patients/{{ r.visit.patient.id }}/"><span class="d-inline-flex align-items-center gap-2">{% include 'partials/avatar.html' with photo=r.visit.patient.profile_photo size=28 %}<span>{{ r.visit.patient.full_name }}</span></span></a>
+            <div class="small">Type: {{ r.lab_type }}</div>
+            <div class="small text-muted">Verified: {{ r.visit.timestamp|date:'Y-m-d H:i' }}{% if r.visit.queue_number %} · Queue: {{ r.visit.queue_number }}{% endif %}</div>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-primary btn-sm" href="/dashboard/lab/work/{{ r.visit.id }}/"><i class="bi bi-flask me-1"></i>Start Lab Work</a>
+          </div>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No verified patients ready for lab work.</li>
+      {% endfor %}
+    </ul>
+    
+    <h6>Not Done Lab Work</h6>
+    <ul class="list-group" data-container="not_done">
+      {% for r in not_done %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a class="fw-semibold" href="/patients/{{ r.visit.patient.id }}/"><span class="d-inline-flex align-items-center gap-2">{% include 'partials/avatar.html' with photo=r.visit.patient.profile_photo size=28 %}<span>{{ r.visit.patient.full_name }}</span></span></a>
+            <div class="small">Type: {{ r.lab_type }}</div>
+            <div class="small text-muted">Status: In Progress</div>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-primary btn-sm" href="/dashboard/lab/work/{{ r.visit.id }}/"><i class="bi bi-pencil-square me-1"></i>Edit</a>
+            <form method="post" action="/dashboard/lab/{{ r.visit.id }}/done/">
+              {% csrf_token %}
+              <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-check2-circle me-1"></i>Complete</button>
+            </form>
+          </div>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No in-progress lab work.</li>
+      {% endfor %}
+    </ul>
+    <script>
+    (function(){
+      // Fill hidden input with selected reception visit id when opening modal
+      const modal = document.getElementById('verifyModal');
+      if (modal) {
+        modal.addEventListener('show.bs.modal', function (event) {
+          const button = event.relatedTarget;
+          if (!button) return;
+          const id = button.getAttribute('data-visit');
+          const input = modal.querySelector('#verifyVisitId');
+          if (input) input.value = id || '';
+      // Start scanning
+      const video = modal.querySelector('#modalVideo');
+      const status = modal.querySelector('#modalStatus');
+      const out = modal.querySelector('#modalScanned');
+      const codeHidden = modal.querySelector('#verifyCodeHidden');
+      const typeSel = modal.querySelector('#modalTestType');
+      const submitBtn = modal.querySelector('#modalSubmitBtn');
+      let stream;
+      let detecting = false;
+      async function start(){
+        try{
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          video.srcObject = stream;
+          await video.play();
+          status.textContent = 'Point the camera at the QR code.';
+          if ('BarcodeDetector' in window) {
+            const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+            detecting = true;
+            (async function loop(){
+              while(detecting){
+                try{
+                  const det = await detector.detect(video);
+                  if(det && det.length){
+                    const value = det[0].rawValue || det[0].rawValue;
+                    out.textContent = value || '—';
+                    codeHidden.value = value || '';
+                    typeSel.disabled = !value && !(emailInput && emailInput.value);
+                    submitBtn.disabled = !(value || (emailInput && emailInput.value)) || !typeSel.value;
+                    status.textContent = 'QR captured.';
+                    break;
+                  }
+                }catch(e){}
+                await new Promise(r=>setTimeout(r, 200));
+              }
+            })();
+          } else {
+            status.textContent = '';
+          }
+        }catch(e){
+          status.textContent = 'Unable to access camera: ' + e.message;
+        }
+      }
+      start();
+      // Enable submit when test type chosen or email entered; enable test type select when email present
+      const emailInput = document.getElementById('modalPatientEmail');
+      const emailError = document.getElementById('emailError');
+      const emailOk = document.getElementById('emailOk');
+      const profileCard = document.getElementById('labVerifiedProfile');
+      const nameEl = document.getElementById('labPatientName');
+      const codeEl = document.getElementById('labPatientCode');
+      const mailEl = document.getElementById('labPatientEmail');
+      const photoEl = document.getElementById('labPatientPhoto');
+      const badgeEl = document.getElementById('labVerifiedBadge');
+      let emailVerified = false;
+      function isVerified(){ return !!(codeHidden.value) || emailVerified || (modal && modal.dataset.verified === '1'); }
+      function updateSubmitState(){ if(submitBtn){ submitBtn.disabled = !(isVerified() && typeSel.value); } }
+      function updateSelectEnabled(){ if(typeSel){ typeSel.disabled = !isVerified(); } }
+      function showProfile(p){
+        if(!profileCard) return;
+        if(p){
+          nameEl && (nameEl.textContent = p.full_name || '');
+          codeEl && (codeEl.textContent = p.patient_code || '');
+          mailEl && (mailEl.textContent = p.email || '');
+          if(photoEl){ if(p.profile_photo_url){ photoEl.src = p.profile_photo_url; photoEl.style.display='inline-block'; } else { photoEl.src=window.DEFAULT_AVATAR; photoEl.style.display='inline-block'; } }
+          badgeEl && badgeEl.classList.remove('d-none');
+          profileCard.classList.remove('d-none');
+        } else {
+          profileCard.classList.add('d-none');
+        }
+      }
+      typeSel && typeSel.addEventListener('change', updateSubmitState);
+      if(emailInput){ emailInput.addEventListener('input', function(){ emailVerified = false; emailOk && emailOk.classList.add('d-none'); emailError && emailError.classList.add('d-none'); updateSelectEnabled(); updateSubmitState(); }); }
+      const btnVerifyEmail = document.getElementById('btnVerifyEmail');
+      if(btnVerifyEmail){
+        btnVerifyEmail.addEventListener('click', async function(){
+          emailError && emailError.classList.add('d-none');
+          emailOk && emailOk.classList.add('d-none');
+          const email = (emailInput && emailInput.value || '').trim();
+          const visitId = (document.getElementById('verifyVisitId')||{}).value || '';
+          if(!email){ emailError && (emailError.textContent='Enter an email.', emailError.classList.remove('d-none')); return; }
+          if(!visitId){ emailError && (emailError.textContent='Missing visit.', emailError.classList.remove('d-none')); return; }
+          try{
+            const form = new FormData();
+            form.append('patient_email', email);
+            form.append('reception_visit_id', visitId);
+            const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            const resp = await fetch('/dashboard/lab/verify-email/', {method:'POST', headers: {'X-CSRFToken': csrf ? csrf.value : ''}, body: form});
+            const data = await resp.json();
+            if(!data.success){ throw new Error(data.message || 'Verification failed'); }
+            emailVerified = true;
+            emailOk && emailOk.classList.remove('d-none');
+            if(modal){ modal.dataset.verified = '1'; }
+            // Populate profile from response if available
+            if(data.patient){ showProfile(data.patient); }
+            updateSelectEnabled();
+            updateSubmitState();
+          }catch(e){
+            emailVerified = false;
+            emailError && (emailError.textContent = e.message || 'Email does not match this patient.', emailError.classList.remove('d-none'));
+            if(modal){ modal.dataset.verified = ''; }
+            updateSelectEnabled();
+            updateSubmitState();
+          }
+        });
+      }
+      // Intercept submit for AJAX to keep UI consistent
+      const formEl = modal.querySelector('form');
+      if(formEl){
+        formEl.addEventListener('submit', async function(e){
+          e.preventDefault();
+          const fd = new FormData(formEl);
+          // set loading state
+          const submitBtn = modal.querySelector('#modalSubmitBtn');
+          if(submitBtn){ submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…'; }
+          try{
+            const resp = await fetch(formEl.action, { method:'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
+            const data = await resp.json();
+            if(!data || !data.success){ throw new Error((data && data.message) || 'Failed to receive.'); }
+            // Success: keep modal-only flow (no redirect). Optionally allow closing manually.
+            // Remove from claimed list (reception ticket li)
+            const recId = fd.get('reception_visit_id');
+            const claimedLi = recId ? document.querySelector(`[data-container="claimed"] [data-visit-id="${recId}"]`) : null;
+            if(claimedLi){ claimedLi.remove(); }
+            // Refresh the Ready list from server to reflect accurate markup
+            try{
+              const pageHtml = await fetch(window.location.pathname, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(r=>r.text());
+              const tempDiv = document.createElement('div'); tempDiv.innerHTML = pageHtml;
+              const newReady = tempDiv.querySelector('ul[data-container="ready"]');
+              const curReady = document.querySelector('ul[data-container="ready"]');
+              if(newReady && curReady){ curReady.innerHTML = newReady.innerHTML; }
+            }catch(_){}
+            // Show a toast-like alert
+            const msg = document.createElement('div');
+            msg.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+            msg.style.zIndex = '1060';
+            msg.textContent = data.message || 'Patient moved to In Process.';
+            document.body.appendChild(msg);
+            setTimeout(()=>{ msg.remove(); }, 1500);
+            // close modal and reset button
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            if(bsModal) bsModal.hide();
+            if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Verify & Receive'; }
+          }catch(err){
+            const errBox = modal.querySelector('#emailError');
+            if(errBox){ errBox.textContent = err.message || 'Error receiving patient.'; errBox.classList.remove('d-none'); }
+            const submitBtn = modal.querySelector('#modalSubmitBtn');
+            if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Verify & Receive'; }
+          }
+        });
+      }
+      // Initialize states on open
+      // reset verified state on open
+      if(modal){ modal.dataset.verified = ''; }
+      updateSelectEnabled();
+      updateSubmitState();
+      // Stop on close
+      modal.addEventListener('hide.bs.modal', function(){
+        detecting = false;
+        if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+      }, { once: true });
+        });
+      }
+    })();
+    // Intercept claim submit to claim via AJAX then open Verify modal
+    (function(){
+      document.addEventListener('submit', async function(e){
+        const form = e.target;
+        if(!form || !form.action) return;
+        if(form.action.endsWith('/dashboard/lab/claim/')){
+          e.preventDefault();
+          const fd = new FormData(form);
+          const btn = form.querySelector('button[type="submit"]');
+          if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Claiming…'; }
+          try{
+            await fetch(form.action, { method:'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          }catch(_){ }
+          try{
+            const html = await fetch(window.location.pathname, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(r=>r.text());
+            const tmp = document.createElement('div'); tmp.innerHTML = html;
+            const newQueued = tmp.querySelector('ul[data-container="queued"]');
+            const newClaimed = tmp.querySelector('ul[data-container="claimed"]');
+            const curQueued = document.querySelector('ul[data-container="queued"]');
+            const curClaimed = document.querySelector('ul[data-container="claimed"]');
+            if(newQueued && curQueued){ curQueued.innerHTML = newQueued.innerHTML; }
+            if(newClaimed && curClaimed){ curClaimed.innerHTML = newClaimed.innerHTML; }
+          }catch(_){ }
+          // Inform user; Verify modal will be opened when the Verify button is clicked
+          const vid = fd.get('reception_visit_id') || '';
+          const vm = document.getElementById('verifyModal');
+          if(vm){
+            const input = vm.querySelector('#verifyVisitId');
+            if(input) input.value = vid;
+          }
+          const n = document.createElement('div');
+          n.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+          n.style.zIndex = '1060';
+          n.textContent = 'Ticket claimed. Click Verify to proceed when patient arrives.';
+          document.body.appendChild(n);
+          setTimeout(()=>{ n.remove(); }, 1500);
+        }
+      });
+    })();
+    // Page-specific QR verification callback to keep flow inside modal
+    (function(){
+      window.handleVerifyQRCallback = async function(email){
+        const m = document.getElementById('verifyModal');
+        if(!m) return;
+        // Ensure modal open
+        const bs = bootstrap.Modal.getOrCreateInstance(m);
+        bs.show();
+        // Fill email field
+        const emailInput = document.getElementById('modalPatientEmail');
+        if(emailInput){ emailInput.value = email; }
+        // Trigger email verify programmatically to fetch patient and enable controls
+        const visitId = (document.getElementById('verifyVisitId')||{}).value || '';
+        try{
+          const form = new FormData();
+          form.append('patient_email', email);
+          form.append('reception_visit_id', visitId);
+          const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+          const resp = await fetch('/dashboard/lab/verify-email/', {method:'POST', headers:{'X-CSRFToken': csrf ? csrf.value : ''}, body: form});
+          const data = await resp.json();
+          if(!data.success) throw new Error(data.message||'Verification failed');
+          // Mark verified and show profile
+          const emailOk = document.getElementById('emailOk');
+          emailOk && emailOk.classList.remove('d-none');
+          if(data.patient){
+            const profile = {
+              full_name: data.patient.full_name,
+              patient_code: data.patient.patient_code,
+              email: data.patient.email,
+              profile_photo_url: data.patient.profile_photo_url || ''
+            };
+            const profileCard = document.getElementById('labVerifiedProfile');
+            const nameEl = document.getElementById('labPatientName');
+            const codeEl = document.getElementById('labPatientCode');
+            const mailEl = document.getElementById('labPatientEmail');
+            const photoEl = document.getElementById('labPatientPhoto');
+            const badgeEl = document.getElementById('labVerifiedBadge');
+            if(profileCard){
+              nameEl && (nameEl.textContent = profile.full_name || '');
+              codeEl && (codeEl.textContent = profile.patient_code || '');
+              mailEl && (mailEl.textContent = profile.email || '');
+              if(photoEl){ if(profile.profile_photo_url){ photoEl.src = profile.profile_photo_url; photoEl.style.display='inline-block'; } else { photoEl.src=window.DEFAULT_AVATAR; photoEl.style.display='inline-block'; } }
+              badgeEl && badgeEl.classList.remove('d-none');
+              profileCard.classList.remove('d-none');
+            }
+          }
+          // Mark verified and enable controls
+          m.dataset.verified = '1';
+          const typeSel = document.getElementById('modalTestType');
+          const submitBtn = document.getElementById('modalSubmitBtn');
+          if(typeSel){ typeSel.disabled = false; }
+          if(submitBtn){ submitBtn.disabled = !typeSel.value; }
+        }catch(e){
+          const emailError = document.getElementById('emailError');
+          emailError && (emailError.textContent = e.message||'Verification error', emailError.classList.remove('d-none'));
+        }
+      };
+    })();
+    (function(){
+      // Map test types to starter templates
+      const templates = {
+        urinalysis: "Urinalysis (Urine Test):\nColor/Clarity: \nSugar: \nProtein: \nBlood: \nLeukocytes/Nitrites: \nNotes: \n",
+        fecalysis: "Fecalysis (Stool Examination):\nConsistency/Color: \nMicroscopy (OVA/Parasites): \nOccult Blood: \nBacteria: \nNotes: \n",
+        fbs: "Fasting Blood Sugar (FBS):\nFasting Hours: \nGlucose: __ mg/dL\nReference: 70–99 mg/dL (fasting)\nNotes: \n",
+        pregnancy: "Pregnancy Test (hCG):\nSpecimen: Urine/Blood\nhCG: Positive / Negative\nNotes: \n",
+        lipid: "Lipid Profile:\nTotal Cholesterol: __ mg/dL\nLDL: __ mg/dL\nHDL: __ mg/dL\nTriglycerides: __ mg/dL\nNotes: \n",
+        rdt: "Rapid Diagnostic Test (RDT):\nAssay: Dengue/Malaria/COVID-19\nResult: Positive / Negative\nControl: Valid / Invalid\nNotes: \n",
+        blood_typing: "Blood Typing (ABO/Rh):\nABO Group: A / B / AB / O\nRh Factor: Positive / Negative\nCrossmatch (if applicable): Compatible / Incompatible\nNotes: \n"
+      };
+      document.addEventListener('change', function(e){
+        const sel = e.target.closest('.lab-type');
+        if(!sel) return;
+        const targetId = sel.getAttribute('data-target');
+        const ta = document.getElementById(targetId);
+        if(!ta) return;
+        const key = sel.value;
+        if(!key) return;
+        // If empty, fill; otherwise append with spacing
+        const base = templates[key] || '';
+        if(!base) return;
+        if(!ta.value.trim()) {
+          ta.value = base;
+        } else {
+          const sep = ta.value.endsWith('\n') ? '' : '\n\n';
+          ta.value = ta.value + sep + base;
+        }
+        ta.focus();
+      });
+    })();
+    </script>
+  </div>
+</div>
+<script>
+// Auto-refresh disabled per request
+// Disable Claim/Receive buttons immediately on click to prevent double actions
+(function(){
+  document.addEventListener('submit', function(e){
+    const form = e.target;
+    if(!form || !form.action) return;
+    if(form.action.includes('/dashboard/lab/claim/') || form.action.includes('/dashboard/lab/receive/')){
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…'; }
+    }
+  });
+})();
+
+// QR scanning inline (uses native BarcodeDetector if available)
+(function(){
+  const btn = null;
+  const wrap = document.getElementById('qr-scan-wrap');
+  if (!wrap) return; // inline scanner markup was replaced by the Verify modal
+  const video = document.getElementById('qr-video');
+  const status = document.getElementById('qr-status');
+  const out = document.getElementById('scanned-code');
+  const typeSel = document.getElementById('lab-type-select');
+  const proceed = document.getElementById('proceed-lab');
+  const err = document.getElementById('qr-error');
+  let stream;
+  let detecting = false;
+  async function start(){
+    err && (err.classList.add('d-none'), err.textContent='');
+    wrap.classList.remove('d-none');
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      await video.play();
+      status.textContent = 'Point the camera at the QR code.';
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        detecting = true;
+        (async function loop(){
+          while(detecting){
+            try{
+              const det = await detector.detect(video);
+              if(det && det.length){ onScan(det[0].rawValue || det[0].rawValue); break; }
+            }catch(e){}
+            await new Promise(r=>setTimeout(r, 200));
+          }
+        })();
+      } else {
+        status.textContent = 'Your browser does not support built-in QR scanning.';
+      }
+    }catch(e){
+      status.textContent = '';
+    }
+  }
+  function stop(){
+    detecting = false;
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  }
+  function onScan(value){
+    stop();
+    out.textContent = value || '—';
+    status.textContent = 'QR captured.';
+    typeSel.disabled = false;
+    proceed.disabled = !typeSel.value;
+    // Preselect matching claimed ticket if in the list
+    const items = document.querySelectorAll('[data-visit-id][data-patient-code]');
+    let foundId = null;
+    items.forEach(el=>{ if((el.getAttribute('data-patient-code')||'').trim().toUpperCase() === (value||'').trim().toUpperCase()){ foundId = el.getAttribute('data-visit-id'); }});
+    proceed.dataset.visitId = foundId || '';
+  }
+  // Auto-start scanner immediately
+  start();
+  if(typeSel){ typeSel.addEventListener('change', function(){ proceed.disabled = !this.value || !out.textContent || out.textContent==='—'; }); }
+  if(proceed){
+    proceed.addEventListener('click', function(e){
+      e.preventDefault();
+      err && (err.classList.add('d-none'), err.textContent='');
+      const code = out.textContent || '';
+      const testType = typeSel.value || '';
+      if(!code || !testType){ err && (err.textContent='Scan QR and select a test type.', err.classList.remove('d-none')); return; }
+      const visitId = proceed.dataset.visitId || '';
+      // Submit to lab_receive as verification + receive
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/dashboard/lab/receive/';
+      const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      if(csrf){ const t=document.createElement('input'); t.type='hidden'; t.name='csrfmiddlewaretoken'; t.value=csrf.value; form.appendChild(t); }
+      const codeIn = document.createElement('input'); codeIn.type='hidden'; codeIn.name='verify_code'; codeIn.value=code; form.appendChild(codeIn);
+      const typeIn = document.createElement('input'); typeIn.type='hidden'; typeIn.name='lab_test_type'; typeIn.value=testType; form.appendChild(typeIn);
+      if(visitId){ const vid=document.createElement('input'); vid.type='hidden'; vid.name='reception_visit_id'; vid.value=visitId; form.appendChild(vid); }
+      document.body.appendChild(form);
+      form.submit();
+    });
+  }
+})();
+</script>
+<script src="{% static 'js/queue.js' %}"></script>
+{% endblock %}
